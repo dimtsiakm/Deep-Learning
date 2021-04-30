@@ -3,7 +3,10 @@ from torch.utils.data import Dataset, DataLoader
 import os
 import cv2
 from torchvision import transforms
-
+from Model import Model
+import torch.nn.functional as F
+from sklearn.metrics import accuracy_score
+from torch.utils.tensorboard import SummaryWriter
 
 class HumanDataset(Dataset):
     def __init__(self, root_dir, mode):
@@ -77,34 +80,77 @@ if __name__ == '__main__':
     dataset_train = HumanDataset('/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/data', 'train')
     dataset_val = HumanDataset('/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/data', 'val')
 
-    train_dataloader = DataLoader(dataset_train, batch_size=16, shuffle=True,
+    batch_size = 16
+    train_size = dataset_train.number_of_images // batch_size + 1
+    val_size = dataset_val.number_of_images // batch_size + 1
+    train_dataloader = DataLoader(dataset_train, batch_size=batch_size, shuffle=True,
                                   num_workers=8, pin_memory=True, drop_last=False)
 
-    val_dataloader = DataLoader(dataset_val, batch_size=16, shuffle=True,
+    val_dataloader = DataLoader(dataset_val, batch_size=batch_size, shuffle=False,
                                   num_workers=8, pin_memory=True, drop_last=False)
 
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     #initialize model
+    model = Model(channels=3).to(device)
+
     #create loss criterion
-    #schedulers learnig rate policies
-    epochs = 20
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=15, verbose=True)
+
+    #schedulers learning rate policies
+    epochs = 200
+    writer = SummaryWriter(log_dir="/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/logs"
+                           , flush_secs=1)
     for e in range(epochs):
+        model.train()
         # train loop
+        epoch_train_loss = 0
+        epoch_train_accuracy = 0
         for i_batch, (images, labels) in enumerate(train_dataloader):
-            print(i_batch, images.shape, labels.shape)
-            #set model to train mode
-            #feed input to model -> forward pass
-            #get batch results -> print/visualize/report
-            #backward pass
-            #optimizer call
+            #print(i_batch, images.shape, labels.shape)
+            logits = model(images.to(device))
+            softmax = F.softmax(logits, dim=1)
 
+            predicted_labels = torch.argmax(softmax, dim=1).cpu().detach().numpy()
 
-        # #validation loop
-        for i_batch, (images, labels) in enumerate(val_dataloader):
-            print(i_batch, images.shape, labels.shape)
-            #set model to eval mode
-            #feed input to model -> forward pass
-            #get batch results -> print/visualize/report
+            epoch_train_accuracy += accuracy_score(labels.numpy(), predicted_labels)
 
-        #save checkpoint every N epochs
+            optimizer.zero_grad()
+            loss = criterion(logits, labels.to(device))
+            loss.backward()
+            optimizer.step()
 
-        exit()
+            epoch_train_loss += loss.item()
+            writer.add_scalar('Loss/train', loss.item(), e*train_size + i_batch)
+            writer.add_scalar('Accuracy/train', accuracy_score(labels.numpy(), predicted_labels), e*train_size + i_batch)
+
+        # # #validation loop
+        epoch_val_loss = 0
+        epoch_val_accuracy = 0
+        # model.eval()
+        with torch.no_grad():
+            for i_batch, (images, labels) in enumerate(val_dataloader):
+                # print(i_batch, images.shape, labels.shape)
+                logits = model(images.to(device))
+                softmax = F.softmax(logits, dim=1)
+
+                predicted_labels = torch.argmax(softmax, dim=1).cpu().detach().numpy()
+
+                epoch_val_accuracy += accuracy_score(labels.numpy(), predicted_labels)
+
+                loss = criterion(logits, labels.to(device))
+
+                epoch_val_loss += loss.item()
+
+                writer.add_scalar('Loss/val', loss.item(), e * val_size + i_batch)
+                writer.add_scalar('Accuracy/val', accuracy_score(labels.numpy(), predicted_labels),
+                                  e * val_size + i_batch)
+
+        scheduler.step(epoch_val_loss/val_size)
+        writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], e)
+        print("epoch {}/{} - train_loss {} - train_acc {} - val_loss {} - val_acc {}".format(e+1, epochs, epoch_train_loss/train_size, epoch_train_accuracy/train_size, epoch_val_loss/val_size, epoch_val_accuracy/val_size))
+
+    #TODO should probably save the best model as regards the minimum loss on val set or save model every N epochs
+    checkpoint_file = 'ckpt.pth'
+    torch.save(model.state_dict(), "/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/logs/" + checkpoint_file)
