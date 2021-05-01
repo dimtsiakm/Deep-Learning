@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(channels=3).to(device)
-    PATH = '/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/logs/cosine_annealing/ckpt.pth'
+    PATH = 'D:\Development\Testing\Deep-Learning\Models\ckpt.pth'
     model.load_state_dict(torch.load(PATH))
     model.eval()
 
@@ -41,17 +41,17 @@ if __name__ == '__main__':
             print("Can't receive frame (stream end?). Exiting ...")
             break
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb = np.expand_dims(rgb, axis=0)
-        image = data_transforms(rgb).to(device)
 
+        image = data_transforms(rgb).to(device)
+        image = torch.unsqueeze(image, 0)
 
         with torch.no_grad():
             out = model(image)
-            softmax = F.softmax(out, dim=1)
-            predicted_label = torch.argmax(softmax, dim=1).cpu().detach().numpy()
-            predicted_label = get_key(predicted_label[0])
+            softmax = F.softmax(out)
+            predicted_label = torch.argmax(softmax).cpu().detach().numpy()
+            predicted_label = get_key(predicted_label)
 
-        cv2.putText(frame, predicted_label, (frame.size[0]//2, 20), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
+        cv2.putText(frame, predicted_label, (256, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, 255)
         cv2.imshow('frame', frame)
         if cv2.waitKey(1) == ord('q'):
             break
