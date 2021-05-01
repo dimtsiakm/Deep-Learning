@@ -96,10 +96,12 @@ if __name__ == '__main__':
     #create loss criterion
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=15, verbose=True)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=1e-1)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=15, verbose=True)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 10, T_mult=1, eta_min=0, last_epoch=-1, verbose=True)
 
     #schedulers learning rate policies
-    epochs = 200
+    epochs = 150
     writer = SummaryWriter(log_dir="/media/dimitris/data_linux/Deep Learning Assignment/CNN/dataset_human_position/logs"
                            , flush_secs=1)
     for e in range(epochs):
