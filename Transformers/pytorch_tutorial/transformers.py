@@ -1,12 +1,16 @@
 import math
-
+import time
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch.utils.tensorboard import SummaryWriter
+from torchtext.datasets import WikiText2
+from torchtext.data.utils import get_tokenizer
+from collections import Counter
+from torchtext.vocab import Vocab
+
 
 class TransformerModel(nn.Module):
-
     def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
@@ -37,8 +41,8 @@ class TransformerModel(nn.Module):
         output = self.decoder(output)
         return output
 
-class PositionalEncoding(nn.Module):
 
+class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -56,32 +60,11 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-
-import io
-import torch
-from torchtext.datasets import WikiText2
-from torchtext.data.utils import get_tokenizer
-from collections import Counter
-from torchtext.vocab import Vocab
-
-train_iter = WikiText2(split='train')
-tokenizer = get_tokenizer('basic_english')
-counter = Counter()
-for line in train_iter:
-    counter.update(tokenizer(line))
-vocab = Vocab(counter)
-
 def data_process(raw_text_iter):
-  data = [torch.tensor([vocab[token] for token in tokenizer(item)],
-                       dtype=torch.long) for item in raw_text_iter]
-  return torch.cat(tuple(filter(lambda t: t.numel() > 0, data)))
+    data = [torch.tensor([vocab[token] for token in tokenizer(item)],
+                         dtype=torch.long) for item in raw_text_iter]
+    return torch.cat(tuple(filter(lambda t: t.numel() > 0, data)))
 
-train_iter, val_iter, test_iter = WikiText2()
-train_data = data_process(train_iter)
-val_data = data_process(val_iter)
-test_data = data_process(test_iter)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def batchify(data, bsz):
     # Divide the dataset into bsz parts.
@@ -92,38 +75,16 @@ def batchify(data, bsz):
     data = data.view(bsz, -1).t().contiguous()
     return data.to(device)
 
-batch_size = 20
-eval_batch_size = 10
-train_data = batchify(train_data, batch_size)
-val_data = batchify(val_data, eval_batch_size)
-test_data = batchify(test_data, eval_batch_size)
 
-print("brake dance")
-
-bptt = 35
 def get_batch(source, i):
     seq_len = min(bptt, len(source) - 1 - i)
-    data = source[i:i+seq_len]
-    target = source[i+1:i+1+seq_len].reshape(-1)
+    data = source[i:i + seq_len]
+    target = source[i + 1:i + 1 + seq_len].reshape(-1)
     return data, target
 
-ntokens = len(vocab.stoi) # the size of vocabulary
-emsize = 200 # embedding dimension
-nhid = 200 # the dimension of the feedforward network model in nn.TransformerEncoder
-nlayers = 2 # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
-nhead = 2 # the number of heads in the multiheadattention models
-dropout = 0.2 # the dropout value
-model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout).to(device)
-
-import time
-
-criterion = nn.CrossEntropyLoss()
-lr = 1e1 # learning rate
-optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 
 def train():
-    model.train() # Turn on the train mode
+    model.train()  # Turn on the train mode
     total_loss = 0.
     start_time = time.time()
     src_mask = model.generate_square_subsequent_mask(bptt).to(device)
@@ -140,20 +101,25 @@ def train():
 
         total_loss += loss.item()
         log_interval = 200
+
         if batch % log_interval == 0 and batch > 0:
             cur_loss = total_loss / log_interval
             elapsed = time.time() - start_time
+            writer.add_scalar('Loss/train', cur_loss, ((epoch - 1) * (len(train_data) // bptt) + batch))
+            writer.add_scalar('lr/train', scheduler.get_last_lr()[0], ((epoch - 1) * (len(train_data) // bptt) + batch))
             print('| epoch {:3d} | {:5d}/{:5d} batches | '
                   'lr {:02.2f} | ms/batch {:5.2f} | '
                   'loss {:5.2f} | ppl {:8.2f}'.format(
-                    epoch, batch, len(train_data) // bptt, scheduler.get_last_lr()[0],
-                    elapsed * 1000 / log_interval,
-                    cur_loss, math.exp(cur_loss)))
+                epoch, batch, len(train_data) // bptt, scheduler.get_last_lr()[0],
+                              elapsed * 1000 / log_interval,
+                cur_loss, 1))
             total_loss = 0
             start_time = time.time()
 
+
+
 def evaluate(eval_model, data_source):
-    eval_model.eval() # Turn on the evaluation mode
+    eval_model.eval()  # Turn on the evaluation mode
     total_loss = 0.
     src_mask = model.generate_square_subsequent_mask(bptt).to(device)
     with torch.no_grad():
@@ -167,28 +133,68 @@ def evaluate(eval_model, data_source):
     return total_loss / (len(data_source) - 1)
 
 
+train_iter = WikiText2(split='train')
+tokenizer = get_tokenizer('basic_english')
+counter = Counter()
+for line in train_iter:
+    counter.update(tokenizer(line))
+vocab = Vocab(counter)
+
+train_iter, val_iter, test_iter = WikiText2()
+train_data = data_process(train_iter)
+val_data = data_process(val_iter)
+test_data = data_process(test_iter)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+print("brake dance")
+
+batch_size = 20
+eval_batch_size = 10
+train_data = batchify(train_data, batch_size)
+val_data = batchify(val_data, eval_batch_size)
+test_data = batchify(test_data, eval_batch_size)
+
+
+bptt = 35
+ntokens = len(vocab.stoi)  # the size of vocabulary
+emsize = 200  # embedding dimension
+nhid = 200  # the dimension of the feedforward network model in nn.TransformerEncoder
+nlayers = 5  # the number of nn.TransformerEncoderLayer in nn.TransformerEncoder
+nhead = 2  # the number of heads in the multiheadattention models
+dropout = 0.2  # the dropout value
+model = TransformerModel(ntokens, emsize, nhead, nhid, nlayers, dropout).to(device)
+
 best_val_loss = float("inf")
-epochs = 7 # The number of epochs
+epochs = 10  # The number of epochs
 best_model = None
+criterion = nn.CrossEntropyLoss()
+lr = 2 # learning rate
+optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+#optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+#scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.9)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, eta_min=0, last_epoch=-1, verbose=False)
+writer = SummaryWriter(log_dir="/media/dimitris/data_linux/Deep Learning Assignment/Transformers/pytorch_tutorial/logs",
+                       flush_secs=1)
 
 for epoch in range(1, epochs + 1):
     epoch_start_time = time.time()
     train()
     val_loss = evaluate(model, val_data)
+
     print('-' * 89)
     print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
           'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                     val_loss, math.exp(val_loss)))
+                                     val_loss, 1))
     print('-' * 89)
 
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         best_model = model
-
     scheduler.step()
 
 test_loss = evaluate(best_model, test_data)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-    test_loss, math.exp(test_loss)))
+    test_loss, 1))
 print('=' * 89)
