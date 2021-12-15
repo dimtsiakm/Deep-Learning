@@ -1,0 +1,60 @@
+#VRML_SIM R2021a utf8
+WorldInfo {
+  info [
+    "Autonomous Vehicle Simulation"
+    "The simple controller example uses an on-board camera to follow the yellow road lines and a SICK sensor to avoid the obstacles."
+    "The control of the vehicle is done using the driver library."
+    "The vehicle based on the Car PROTO is modelled with realistic physics properties: motor torques, body mass, friction forces, suspensions, etc."
+  ]
+  title "City"
+  ERP 0.6
+  basicTimeStep 10
+  coordinateSystem "NUE"
+  lineScale 1
+}
+Viewpoint {
+  fieldOfView 0.5
+  orientation -0.010394599155979328 0.992747991159602 0.11976384411399507 3.015036413447349
+  position 28.641707936507856 67.46068975538154 -272.64892944609403
+  near 1
+  follow "TIAGo Iron"
+  followSmoothness 0
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Fog {
+  color 0.38 0.35 0.32
+  visibilityRange 1000
+}
+TiagoIron {
+  translation 0 0 -100
+  rotation -0.5787240046335491 -0.5781833108018455 -0.5751370146070622 2.096901578477701
+  controller "<extern>"
+  supervisor TRUE
+  cameraSlot [
+    DEF camera Camera {
+      translation 0 0.5 0
+      rotation 0 -1 0 1.5724987151386935
+      fieldOfView 0.35
+      width 800
+      height 600
+      zoom Zoom {
+        minFieldOfView 0.1
+      }
+    }
+  ]
+  lidarSlot [
+    Display {
+      width 800
+      height 600
+    }
+  ]
+}
+Floor {
+  translation 0 0 -10
+  size 50 200
+  appearance Parquetry {
+  }
+}

@@ -1,0 +1,111 @@
+#VRML_SIM R2021a utf8
+WorldInfo {
+  info [
+    "Autonomous Vehicle Simulation"
+    "The simple controller example uses an on-board camera to follow the yellow road lines and a SICK sensor to avoid the obstacles."
+    "The control of the vehicle is done using the driver library."
+    "The vehicle based on the Car PROTO is modelled with realistic physics properties: motor torques, body mass, friction forces, suspensions, etc."
+  ]
+  title "MavicInARoom"
+  basicTimeStep 8
+  defaultDamping Damping {
+    linear 0.5
+    angular 0.5
+  }
+  coordinateSystem "NUE"
+}
+Viewpoint {
+  fieldOfView 0.5
+  orientation -0.5153135234956906 0.7371726905491384 0.43706795445445384 1.7229642000187055
+  position 7.135608032772929 13.563296624970567 -18.950305604866525
+  near 1
+  follow "Mavic 2 PRO"
+  followSmoothness 1
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Fog {
+  color 0.38 0.35 0.32
+  visibilityRange 1000
+}
+Floor {
+  translation 0 0 -10
+  size 25 25
+  appearance Parquetry {
+  }
+}
+Wall {
+  translation -12.42 0 -10.05
+  rotation 0 1 0 1.5708
+  size 25 4 0.2
+}
+Wall {
+  translation 12.5 0 -10.05
+  rotation 0 1 0 1.5708
+  name "wall(3)"
+  size 25 4 0.2
+}
+Wall {
+  translation 0 0 2.5
+  name "wall(2)"
+  size 25 4 0.2
+}
+Wall {
+  translation 0 0 -22.54
+  name "wall(1)"
+  size 25 4 0.2
+}
+OilBarrel {
+  translation 11.49 0.44 -6.62
+}
+Door {
+  translation -5.42 0 2.28
+}
+OilBarrel {
+  translation -9.69 0.44 0
+  name "oil barrel(1)"
+}
+OilBarrel {
+  translation 8.77 0.44 0
+  name "oil barrel(2)"
+}
+OilBarrel {
+  translation 8.77 0.44 0
+  name "oil barrel(3)"
+}
+OilBarrel {
+  translation 11.25 0.44 -14.7
+  name "oil barrel(4)"
+}
+Window {
+  translation 5.83 0 -22.4
+}
+Window {
+  translation -2.74 0 -22.4
+  name "window(1)"
+}
+Window {
+  translation 2.92 0 -22.4
+  name "window(2)"
+}
+Window {
+  translation 0.37 0 -22.4
+  name "window(3)"
+}
+SquareManhole {
+  translation 0 0 -20
+}
+Mavic2Pro {
+  translation 0 0.1 -20
+  rotation -0.7745957748881706 -0.44721387003139484 -0.44721487003110416 1.82348
+  controller "<extern>"
+  supervisor TRUE
+  cameraSlot [
+    Camera {
+      width 800
+      height 600
+    }
+  ]
+}
